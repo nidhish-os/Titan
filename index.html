@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Project TITAN — AI Core (Particle Storm Engine)</title>
+<meta name="description" content="TITAN Particle Storm — a gesture-driven WebGL particle sphere with an AI Core state engine. Runs entirely in your browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <div id="backdrop"></div>
+  <video id="webcam" class="hidden-source" autoplay playsinline muted></video>
+  <canvas id="scene"></canvas>
+  <canvas id="hud"></canvas>
+  <div class="vignette"></div>
+
+  <div class="chrome">
+    <div class="chrome-top">
+      <div class="brand">
+        <p class="eyebrow">AI Core / Gesture-Driven / WebGL</p>
+        <h1>Particle&nbsp;Storm</h1>
+      </div>
+      <div class="status-stack">
+        <div class="status">
+          <span id="statusText">searching for hand</span>
+          <span id="statusDot" class="status-dot"></span>
+        </div>
+        <div class="core-status">
+          <span class="core-desc" id="coreDesc">awaiting input</span>
+          <span id="coreLabel">IDLE</span>
+          <span id="coreDot" class="core-dot"></span>
+        </div>
+        <button id="modePill" class="mode-pill" type="button">Mouse/touch mode · tap to switch</button>
+        <span id="qualityNote" class="quality-note"></span>
+      </div>
+    </div>
+
+    <div class="chrome-bottom">
+      <div class="legend">
+        <p class="legend-title">Controls</p>
+        <div class="legend-row"><span class="key">Move</span><span class="val">rotate sphere</span></div>
+        <div class="legend-row"><span class="key">Pinch</span><span class="val">charge up</span></div>
+        <div class="legend-row"><span class="key">Release</span><span class="val">explode particles</span></div>
+        <div class="legend-row"><span class="key">Two hands / fingers</span><span class="val">pinch to scale</span></div>
+        <div class="legend-row"><span class="key">Open hand</span><span class="val">expand field</span></div>
+        <div class="legend-row"><span class="key">Fist</span><span class="val">compress field</span></div>
+        <div class="legend-row"><span class="key">Swipe</span><span class="val">turbulence gust</span></div>
+        <div class="legend-row"><span class="key">` key / M key</span><span class="val">AI core panel / switch mode</span></div>
+      </div>
+      <p class="legend-mobile">Drag to rotate · hold to charge, release to burst · two fingers to scale · flick for turbulence</p>
+    </div>
+  </div>
+
+  <div id="devPanel" class="dev-panel hidden">
+    <p class="dev-panel-title">AI Core / Dev Trigger</p>
+    <div id="devPanelButtons"></div>
+    <p class="dev-panel-hint">Manually drives the kernel's core state so the render engine can be verified state-by-state. Later milestones replace these clicks with real triggers (voice, reasoning calls, vision events).<br>` toggles · [ ] cycles · M switches input mode</p>
+  </div>
+
+  <div id="touchDock" class="touch-dock">
+    <button type="button" data-gesture="charge">Pop</button>
+    <button type="button" data-gesture="core">Core</button>
+  </div>
+
+  <!-- Start gate -->
+  <div id="startScreen" class="overlay">
+    <div class="overlay-inner">
+      <p class="eyebrow">Real-time particle field</p>
+      <h2>Particle Storm</h2>
+      <p>A particle sphere that lives on your webcam feed. Move your hand to spin it, pinch to charge it up, and let go to blow it apart. Open your hand to expand the field, make a fist to pull it in tight. Everything runs in your browser — nothing is recorded or uploaded.</p>
+      <div class="choices">
+        <button id="startBtn" class="btn">Enable Camera &amp; Begin</button>
+        <button id="useMouseBtn" class="btn-ghost">Use Mouse / Touch Instead</button>
+      </div>
+      <p class="foot-note">Camera mode needs a webcam and a browser that supports getUserMedia. No camera? Mouse and touch give you the same interactions.</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingScreen" class="overlay hidden">
+    <div class="overlay-inner">
+      <div class="spinner"></div>
+      <p class="eyebrow">Calibrating</p>
+      <h2 style="font-size:22px;">Loading hand tracking…</h2>
+      <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+      <p>First run downloads the tracking model — this only takes a moment.</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="errorScreen" class="overlay hidden">
+    <div class="overlay-inner">
+      <p class="eyebrow" style="color:var(--magenta);">Something went wrong</p>
+      <h2 style="font-size:24px;">Couldn't start the camera</h2>
+      <p id="errorMessage">Camera access was blocked or unavailable. Check your browser's permissions for this page and try again.</p>
+      <div class="choices">
+        <button id="retryBtn" class="btn">Try Again</button>
+        <button id="useMouseFromErrorBtn" class="btn-ghost">Continue With Mouse / Touch</button>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/Pass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<script src="js/config.js"></script>
+<script src="js/kernel.js"></script>
+<script src="js/quality.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/gestures.js"></script>
+<script src="js/pointer.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
