@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project TITAN — AI Core (Particle Storm Engine)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#050507;
+    --ink:#eef0f6;
+    --ink-dim:rgba(238,240,246,0.55);
+    --ink-faint:rgba(238,240,246,0.28);
+    --cyan:#5FE7FF;
+    --cyan-deep:#1E5CD6;
+    --gold:#FFE39A;
+    --magenta:#FF4FA3;
+    --line:rgba(238,240,246,0.14);
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg); color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #webcam{
+    position:fixed; inset:0; width:100%; height:100%;
+    object-fit:cover;
+    transform:scaleX(-1);
+    filter:brightness(0.48) contrast(1.12) saturate(0.65);
+    z-index:0;
+  }
+
+  #scene{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:1; pointer-events:none;
+    mix-blend-mode:screen;
+  }
+
+  #hud{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:2; pointer-events:none;
+  }
+
+  .vignette{
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    box-shadow: inset 0 0 18vw 2vw rgba(0,0,0,0.85);
+  }
+
+  .chrome{
+    position:fixed; inset:0; z-index:4; pointer-events:none;
+    padding:28px 32px;
+    display:flex; flex-direction:column; justify-content:space-between;
+  }
+
+  .chrome-top{
+    display:flex; justify-content:space-between; align-items:flex-start;
+  }
+
+  .brand .eyebrow{
+    font-size:11px; letter-spacing:0.32em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 6px 0;
+  }
+  .brand h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700; font-size:26px; letter-spacing:0.02em;
+    margin:0; color:var(--ink);
+  }
+
+  .status-stack{
+    display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+  }
+
+  .status{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .status-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#5a5a66; transition:background 0.25s ease, box-shadow 0.25s ease;
+  }
+  .status-dot.live{
+    background:var(--cyan);
+    box-shadow:0 0 10px 2px rgba(95,231,255,0.65);
+  }
+
+  .core-status{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .core-status .core-desc{
+    color:var(--ink-faint); font-size:10px; letter-spacing:0.05em;
+    text-transform:none;
+  }
+  .core-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#5FE7FF; box-shadow:0 0 10px 2px rgba(95,231,255,0.5);
+    transition:background 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  .legend{
+    display:flex; flex-direction:column; gap:9px;
+    font-size:11.5px; letter-spacing:0.04em;
+    color:var(--ink-dim);
+    max-width:340px;
+  }
+  .legend-row{ display:flex; align-items:baseline; gap:10px; }
+  .legend-row .key{
+    color:var(--ink); font-weight:600; letter-spacing:0.14em;
+    min-width:112px; text-transform:uppercase; font-size:10.5px;
+  }
+  .legend-row .val{ color:var(--ink-faint); }
+  .legend-title{
+    font-size:10px; letter-spacing:0.28em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:2px;
+  }
+
+  .charge-readout{
+    position:absolute; bottom:0; right:0;
+    font-size:11px; color:var(--ink-faint); letter-spacing:0.08em;
+    text-align:right;
+  }
+
+  /* ---- Dev / AI-core trigger panel ---- */
+  .dev-panel{
+    position:fixed; top:50%; right:24px; transform:translateY(-50%);
+    z-index:6; pointer-events:auto;
+    background:rgba(8,9,14,0.88); border:1px solid var(--line);
+    border-radius:4px; padding:14px; width:196px;
+    display:flex; flex-direction:column; gap:6px;
+    backdrop-filter:blur(6px);
+    max-height:76vh; overflow-y:auto;
+  }
+  .dev-panel.hidden{ display:none !important; }
+  .dev-panel-title{
+    font-size:9.5px; letter-spacing:0.22em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 4px 0;
+  }
+  #devPanelButtons{ display:flex; flex-direction:column; gap:5px; }
+  .dev-panel button{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--ink-dim); background:rgba(238,240,246,0.05);
+    border:1px solid var(--line); border-radius:2px;
+    padding:7px 8px; text-align:left; cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .dev-panel button:hover{ background:rgba(95,231,255,0.1); color:var(--ink); border-color:rgba(95,231,255,0.35); }
+  .dev-panel button.active{ color:var(--ink); border-color:var(--cyan); background:rgba(95,231,255,0.16); }
+  .dev-panel-hint{
+    font-size:9px; color:var(--ink-faint); letter-spacing:0.03em;
+    margin-top:6px; line-height:1.55;
+  }
+
+  /* ---- Gate / loading / error overlays ---- */
+  .overlay{
+    position:fixed; inset:0; z-index:10;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(10,10,14,0.94) 0%, rgba(2,2,4,0.98) 70%);
+    text-align:center; padding:32px;
+  }
+  .overlay-inner{ max-width:480px; }
+  .overlay .eyebrow{
+    font-size:11px; letter-spacing:0.32em; text-transform:uppercase;
+    color:var(--cyan); margin:0 0 14px 0;
+  }
+  .overlay h2{
+    font-family:'Space Grotesk', sans-serif; font-weight:700;
+    font-size:clamp(28px, 5vw, 44px); margin:0 0 16px 0; color:var(--ink);
+    letter-spacing:0.01em;
+  }
+  .overlay p{
+    font-size:13.5px; line-height:1.7; color:var(--ink-dim);
+    margin:0 0 28px 0;
+  }
+  .btn{
+    pointer-events:auto;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px; letter-spacing:0.16em; text-transform:uppercase;
+    color:#04121a; background:var(--cyan);
+    border:none; border-radius:2px;
+    padding:15px 30px; cursor:pointer;
+    transition:transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow:0 0 0 rgba(95,231,255,0);
+  }
+  .btn:hover{ transform:translateY(-1px); box-shadow:0 6px 22px -6px rgba(95,231,255,0.55); }
+  .btn:active{ transform:translateY(0); }
+  .btn:focus-visible{ outline:2px solid var(--ink); outline-offset:3px; }
+
+  .spinner{
+    width:26px; height:26px; margin:0 auto 22px auto;
+    border-radius:50%;
+    border:2px solid rgba(95,231,255,0.18);
+    border-top-color:var(--cyan);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .hidden{ display:none !important; }
+
+  .foot-note{
+    font-size:10.5px; color:var(--ink-faint); letter-spacing:0.04em;
+    margin-top:18px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .spinner{ animation:none; }
+  }
+
+  @media (max-width:640px){
+    .chrome{ padding:18px 18px; }
+    .brand h1{ font-size:19px; }
+    .legend{ max-width:220px; font-size:10px; }
+    .legend-row .key{ min-width:84px; font-size:9px; }
+    .dev-panel{ right:12px; width:158px; padding:10px; max-height:64vh; }
+    .dev-panel button{ font-size:9.5px; padding:6px 7px; }
+  }
+</style>
+</head>
+<body>
+
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="scene"></canvas>
+  <canvas id="hud"></canvas>
+  <div class="vignette"></div>
+
+  <div class="chrome">
+    <div class="chrome-top">
+      <div class="brand">
+        <p class="eyebrow">AI Core / Gesture-Driven / WebGL</p>
+        <h1>Particle&nbsp;Storm</h1>
+      </div>
+      <div class="status-stack">
+        <div class="status">
+          <span id="statusText">searching for hand</span>
+          <span id="statusDot" class="status-dot"></span>
+        </div>
+        <div class="core-status">
+          <span class="core-desc" id="coreDesc">awaiting input</span>
+          <span id="coreLabel">IDLE</span>
+          <span id="coreDot" class="core-dot"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chrome-bottom">
+      <div class="legend">
+        <p class="legend-title">Controls</p>
+        <div class="legend-row"><span class="key">Move hand</span><span class="val">rotate sphere</span></div>
+        <div class="legend-row"><span class="key">Pinch</span><span class="val">charge up</span></div>
+        <div class="legend-row"><span class="key">Release</span><span class="val">explode particles</span></div>
+        <div class="legend-row"><span class="key">Two hands</span><span class="val">pinch to scale</span></div>
+        <div class="legend-row"><span class="key">` key</span><span class="val">toggle AI core panel</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="devPanel" class="dev-panel hidden">
+    <p class="dev-panel-title">AI Core / Dev Trigger</p>
+    <div id="devPanelButtons"></div>
+    <p class="dev-panel-hint">Manually drives the kernel's core state so the render engine can be verified state-by-state. Later milestones replace these clicks with real triggers (voice, reasoning calls, vision events).<br>` toggles · [ ] cycles</p>
+  </div>
+
+  <!-- Start gate -->
+  <div id="startScreen" class="overlay">
+    <div class="overlay-inner">
+      <p class="eyebrow">3,000 particles / real-time</p>
+      <h2>Particle Storm</h2>
+      <p>A particle sphere that lives on your webcam feed. Move your hand to spin it, pinch to charge it up, and let go to blow it apart. This runs entirely in your browser — nothing is recorded or uploaded.</p>
+      <button id="startBtn" class="btn">Enable Camera &amp; Begin</button>
+      <p class="foot-note">Requires a webcam and a browser that supports getUserMedia.</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingScreen" class="overlay hidden">
+    <div class="overlay-inner">
+      <div class="spinner"></div>
+      <p class="eyebrow">Calibrating</p>
+      <h2 style="font-size:22px;">Loading hand tracking…</h2>
+      <p>First run downloads the tracking model — this only takes a moment.</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="errorScreen" class="overlay hidden">
+    <div class="overlay-inner">
+      <p class="eyebrow" style="color:var(--magenta);">Something went wrong</p>
+      <h2 style="font-size:24px;">Couldn't start the camera</h2>
+      <p id="errorMessage">Camera access was blocked or unavailable. Check your browser's permissions for this page and try again.</p>
+      <button id="retryBtn" class="btn">Try Again</button>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+(function(){
+  'use strict';
+
+  /* =========================================================
+     CONFIG — tweak these if the feel doesn't match your hand
+     or camera setup.
+  ========================================================= */
+  const N_PARTICLES        = 3000;
+  const BASE_RADIUS        = 1.55;
+  const PINCH_CLOSE        = 0.55;   // pinch distance / hand-scale ratio below which = "pinching"
+  const PINCH_OPEN         = 0.92;   // ratio above which a pinch counts as "released"
+  const CHARGE_DURATION_MS = 900;    // time to reach full charge
+  const EXPLODE_FLIGHT_MS  = 1000;   // outward flight time before reforming begins
+  const REFORM_TOTAL_MS    = 2300;   // safety window before forcing particles home
+  const REFORM_CATCHUP     = 3.4;    // higher = snappier return
+  const ROT_RANGE_Y        = Math.PI * 1.15;
+  const ROT_RANGE_X        = Math.PI * 0.55;
+  const ROT_SMOOTHING      = 4.5;
+  const SCALE_MIN          = 0.45;
+  const SCALE_MAX          = 2.1;
+
+  /* =========================================================
+     AI CORE — STATE PROFILES
+     Each AI Core state gets its own motion pattern, color
+     gradient, and glow behavior. This table is the single
+     source of truth the renderer reads from — new states are
+     added here, not by branching the render loop.
+  ========================================================= */
+  const AI_STATES = [
+    'IDLE','LISTENING','THINKING','REASONING','SEARCHING_MEMORY',
+    'GENERATING','SPEAKING','LEARNING','CODING','ANALYZING',
+    'VISION','ERROR','SLEEP'
+  ];
+
+  const STATE_DESCRIPTIONS = {
+    IDLE:              'awaiting input',
+    LISTENING:         'capturing input stream',
+    THINKING:          'processing context',
+    REASONING:         'working through logic',
+    SEARCHING_MEMORY:  'querying memory',
+    GENERATING:        'producing output',
+    SPEAKING:          'streaming response',
+    LEARNING:          'consolidating memory',
+    CODING:            'writing / editing code',
+    ANALYZING:         'inspecting data',
+    VISION:            'reading camera feed',
+    ERROR:             'fault detected',
+    SLEEP:             'low-power standby'
+  };
+
+  // motion: 'wobble' | 'vortex' | 'orbitalBands' | 'scan' | 'burst' | 'breathe' | 'flicker' | 'jitter' | 'visionReactive'
+  const STATE_PROFILES = {
+    IDLE:             { colorDeep:'#173C82', colorBright:'#5FE7FF', glow:0.16, glowPulseAmp:0.04, glowPulseSpeed:1.1, wobbleAmp:0.012, wobbleFreq:1.3, motion:'wobble' },
+    LISTENING:        { colorDeep:'#0E4C63', colorBright:'#8FF7FF', glow:0.30, glowPulseAmp:0.10, glowPulseSpeed:2.6, wobbleAmp:0.016, wobbleFreq:2.2, motion:'wobble' },
+    THINKING:         { colorDeep:'#241259', colorBright:'#9D6BFF', glow:0.24, glowPulseAmp:0.09, glowPulseSpeed:1.7, wobbleAmp:0.020, wobbleFreq:0.9, motion:'vortex' },
+    REASONING:        { colorDeep:'#1B1350', colorBright:'#7A8CFF', glow:0.22, glowPulseAmp:0.05, glowPulseSpeed:0.6, wobbleAmp:0.014, wobbleFreq:0.5, motion:'orbitalBands' },
+    SEARCHING_MEMORY: { colorDeep:'#4A3300', colorBright:'#FFE39A', glow:0.20, glowPulseAmp:0.06, glowPulseSpeed:1.0, wobbleAmp:0.010, wobbleFreq:1.0, motion:'scan' },
+    GENERATING:       { colorDeep:'#5C0E3A', colorBright:'#FF6FC2', glow:0.32, glowPulseAmp:0.14, glowPulseSpeed:3.2, wobbleAmp:0.030, wobbleFreq:3.4, motion:'burst' },
+    SPEAKING:         { colorDeep:'#5A3B00', colorBright:'#FFD98F', glow:0.28, glowPulseAmp:0.16, glowPulseSpeed:4.0, wobbleAmp:0.018, wobbleFreq:2.0, motion:'breathe' },
+    LEARNING:         { colorDeep:'#123A1E', colorBright:'#7CFFC4', glow:0.20, glowPulseAmp:0.05, glowPulseSpeed:0.7, wobbleAmp:0.012, wobbleFreq:0.8, motion:'wobble' },
+    CODING:           { colorDeep:'#0D3B33', colorBright:'#5FFFD1', glow:0.24, glowPulseAmp:0.12, glowPulseSpeed:5.5, wobbleAmp:0.008, wobbleFreq:6.0, motion:'flicker' },
+    ANALYZING:        { colorDeep:'#152238', colorBright:'#BFE9FF', glow:0.20, glowPulseAmp:0.06, glowPulseSpeed:1.4, wobbleAmp:0.010, wobbleFreq:1.1, motion:'scan' },
+    VISION:           { colorDeep:'#0E3B3B', colorBright:'#5FFFEA', glow:0.22, glowPulseAmp:0.08, glowPulseSpeed:1.0, wobbleAmp:0.012, wobbleFreq:1.2, motion:'visionReactive' },
+    ERROR:            { colorDeep:'#4A0A12', colorBright:'#FF4F5E', glow:0.30, glowPulseAmp:0.20, glowPulseSpeed:8.0, wobbleAmp:0.050, wobbleFreq:9.0, motion:'jitter' },
+    SLEEP:            { colorDeep:'#0A0A10', colorBright:'#2A3446', glow:0.05, glowPulseAmp:0.015,glowPulseSpeed:0.3, wobbleAmp:0.004, wobbleFreq:0.4, motion:'wobble' }
+  };
+
+  /* =========================================================
+     AI CORE — EVENT BUS + KERNEL
+     Every subsystem (this milestone: just the renderer + dev
+     panel) talks through here. Nothing calls the renderer
+     directly — it listens for 'state:change' like anything
+     else would.
+  ========================================================= */
+  const TitanEventBus = (function(){
+    const listeners = {};
+    return {
+      on(event, fn){
+        (listeners[event] || (listeners[event] = [])).push(fn);
+        return function off(){
+          listeners[event] = (listeners[event] || []).filter(f => f !== fn);
+        };
+      },
+      off(event, fn){
+        if (listeners[event]) listeners[event] = listeners[event].filter(f => f !== fn);
+      },
+      emit(event, payload){
+        (listeners[event] || []).forEach(fn => {
+          try { fn(payload); } catch(e){ console.error('Titan event handler error [' + event + ']', e); }
+        });
+      }
+    };
+  })();
+
+  const TitanKernel = (function(){
+    let currentState = 'IDLE';
+    let previousState = null;
+    let stateEnteredAt = performance.now();
+
+    function setState(next, meta){
+      if (!STATE_PROFILES[next]){
+        console.warn('Titan: unknown AI core state "' + next + '"');
+        return;
+      }
+      if (next === currentState) return;
+      previousState = currentState;
+      currentState = next;
+      stateEnteredAt = performance.now();
+      refreshBaseColorsForState();
+      TitanEventBus.emit('state:change', { from: previousState, to: currentState, meta: meta || null });
+    }
+
+    return {
+      get currentState(){ return currentState; },
+      get previousState(){ return previousState; },
+      get stateEnteredAt(){ return stateEnteredAt; },
+      setState: setState,
+      states: AI_STATES
+    };
+  })();
+
+  const COLOR_DEEP    = new THREE.Color(STATE_PROFILES.IDLE.colorDeep);
+  const COLOR_BRIGHT  = new THREE.Color(STATE_PROFILES.IDLE.colorBright);
+  const COLOR_CHARGE  = new THREE.Color('#FFE39A');
+  const SPARK_PALETTE = ['#FF4FA3', '#7CFFC4', '#FFD166', '#6BD6FF'].map(c => new THREE.Color(c));
+
+  const HAND_CONNECTIONS = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+  ];
+
+  /* =========================================================
+     DOM
+  ========================================================= */
+  const videoEl      = document.getElementById('webcam');
+  const sceneCanvas  = document.getElementById('scene');
+  const hudCanvas    = document.getElementById('hud');
+  const hudCtx       = hudCanvas.getContext('2d');
+  const startScreen  = document.getElementById('startScreen');
+  const loadingScreen= document.getElementById('loadingScreen');
+  const errorScreen  = document.getElementById('errorScreen');
+  const errorMessage = document.getElementById('errorMessage');
+  const statusDot    = document.getElementById('statusDot');
+  const statusText   = document.getElementById('statusText');
+  const coreLabel    = document.getElementById('coreLabel');
+  const coreDot      = document.getElementById('coreDot');
+  const coreDesc     = document.getElementById('coreDesc');
+  const devPanel     = document.getElementById('devPanel');
+  const devPanelBtns = document.getElementById('devPanelButtons');
+
+  function show(el){ el.classList.remove('hidden'); }
+  function hide(el){ el.classList.add('hidden'); }
+
+  /* =========================================================
+     THREE.JS SETUP
+  ========================================================= */
+  let renderer, scene, camera, sphereGroup, points, coreGlow;
+  let basePositions, positions, velocities, colors, baseColors;
+  let explodeDelays, reformDelays, sparkTargets;
+
+  function fibonacciSphere(n, radius){
+    const pts = [];
+    const offset = 2 / n;
+    const increment = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++){
+      const y = ((i * offset) - 1) + (offset / 2);
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const phi = i * increment;
+      const x = Math.cos(phi) * r;
+      const z = Math.sin(phi) * r;
+      pts.push(x * radius, y * radius, z * radius);
+    }
+    return pts;
+  }
+
+  function makeGlowTexture(){
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grad.addColorStop(0,   'rgba(255,255,255,1)');
+    grad.addColorStop(0.4, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  function initScene(){
+    renderer = new THREE.WebGLRenderer({ canvas: sceneCanvas, antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 4.3);
+    camera.lookAt(0, 0, 0);
+
+    sphereGroup = new THREE.Group();
+    scene.add(sphereGroup);
+
+    const flat = fibonacciSphere(N_PARTICLES, BASE_RADIUS);
+    basePositions = new Float32Array(flat);
+    positions     = new Float32Array(basePositions);
+    velocities    = new Float32Array(N_PARTICLES * 3);
+    colors        = new Float32Array(N_PARTICLES * 3);
+    baseColors    = new Float32Array(N_PARTICLES * 3);
+    explodeDelays = new Float32Array(N_PARTICLES);
+    reformDelays  = new Float32Array(N_PARTICLES);
+    sparkTargets  = new Float32Array(N_PARTICLES * 3);
+
+    const tmp = new THREE.Color();
+    for (let i = 0; i < N_PARTICLES; i++){
+      const y = basePositions[i*3+1] / BASE_RADIUS;
+      const t = (y + 1) / 2;
+      tmp.copy(COLOR_DEEP).lerp(COLOR_BRIGHT, t);
+      colors[i*3] = tmp.r; colors[i*3+1] = tmp.g; colors[i*3+2] = tmp.b;
+      baseColors[i*3] = tmp.r; baseColors[i*3+1] = tmp.g; baseColors[i*3+2] = tmp.b;
+      explodeDelays[i] = Math.random() * 0.3;
+      reformDelays[i]  = Math.random() * 0.5;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.05,
+      vertexColors: true,
+      map: makeGlowTexture(),
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+
+    points = new THREE.Points(geometry, material);
+    sphereGroup.add(points);
+
+    const coreGeo = new THREE.IcosahedronGeometry(0.32, 2);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: COLOR_BRIGHT, transparent: true, opacity: 0.16,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    coreGlow = new THREE.Mesh(coreGeo, coreMat);
+    sphereGroup.add(coreGlow);
+
+    window.addEventListener('resize', onResize);
+    onResize();
+  }
+
+  function onResize(){
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    hudCanvas.width = w * (window.devicePixelRatio || 1);
+    hudCanvas.height = h * (window.devicePixelRatio || 1);
+    hudCanvas.style.width = w + 'px';
+    hudCanvas.style.height = h + 'px';
+    hudCtx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+  }
+
+  /* =========================================================
+     AI CORE — recolor the gesture engine's return-to-base
+     palette whenever the kernel's state changes, so charge /
+     explode / reform stay visually consistent with whatever
+     the AI Core is currently doing.
+  ========================================================= */
+  function refreshBaseColorsForState(){
+    if (!baseColors) return; // scene not built yet — initScene() seeds IDLE colors directly
+    const profile = STATE_PROFILES[TitanKernel.currentState] || STATE_PROFILES.IDLE;
+    const deep = new THREE.Color(profile.colorDeep);
+    const bright = new THREE.Color(profile.colorBright);
+    const tmp = new THREE.Color();
+    for (let i = 0; i < N_PARTICLES; i++){
+      const y = basePositions[i*3+1] / BASE_RADIUS;
+      const t = (y + 1) / 2;
+      tmp.copy(deep).lerp(bright, t);
+      baseColors[i*3] = tmp.r; baseColors[i*3+1] = tmp.g; baseColors[i*3+2] = tmp.b;
+    }
+  }
+
+  /* =========================================================
+     GESTURE STATE
+  ========================================================= */
+  const gesture = {
+    state: 'idle', // idle | charging | exploding | reforming
+    chargeStart: 0,
+    chargeAmount: 0,
+    chargeLandmarks: null,
+    explodeStart: 0,
+    reformStart: 0
+  };
+
+  let latestHands = [];   // array of { lm: landmarks[], pinchRatio, isPinching }
+  let handsEverSeen = false;
+  let twoHandBaseDist = null;
+  let twoHandBaseScale = 1;
+
+  function dist2D(a, b){
+    const dx = a.x - b.x, dy = a.y - b.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+  function pinchRatio(lm){
+    const p = dist2D(lm[4], lm[8]);
+    const scale = dist2D(lm[0], lm[9]) || 0.0001;
+    return p / scale;
+  }
+  function palmCenter(lm){
+    return { x: (lm[0].x + lm[9].x) / 2, y: (lm[0].y + lm[9].y) / 2 };
+  }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+
+  function triggerExplosion(chargeAmount){
+    gesture.explodeStart = performance.now();
+    const strength = 0.55 + chargeAmount * 2.1;
+    for (let i = 0; i < N_PARTICLES; i++){
+      const bx = basePositions[i*3], by = basePositions[i*3+1], bz = basePositions[i*3+2];
+      const rl = Math.hypot(bx, by, bz) || 1;
+      const jitter = 0.65;
+      let dx = bx/rl + (Math.random()-0.5)*jitter;
+      let dy = by/rl + (Math.random()-0.5)*jitter;
+      let dz = bz/rl + (Math.random()-0.5)*jitter;
+      const dl = Math.hypot(dx, dy, dz) || 1;
+      const mag = strength * (0.7 + Math.random()*0.6);
+      velocities[i*3]   = (dx/dl) * mag;
+      velocities[i*3+1] = (dy/dl) * mag;
+      velocities[i*3+2] = (dz/dl) * mag;
+      explodeDelays[i] = Math.random() * 0.28;
+      reformDelays[i]  = Math.random() * 0.5;
+      const c = SPARK_PALETTE[(Math.random() * SPARK_PALETTE.length) | 0];
+      sparkTargets[i*3] = c.r; sparkTargets[i*3+1] = c.g; sparkTargets[i*3+2] = c.b;
+    }
+  }
+
+  function updateGesture(now){
+    let anyHandPinching = false;
+    for (const h of latestHands){
+      h.pinchRatio = pinchRatio(h.lm);
+      h.isPinching = h.pinchRatio < PINCH_CLOSE;
+      if (h.isPinching) anyHandPinching = true;
+    }
+
+    // two-hand pinch-to-scale takes priority when both hands are pinching
+    const twoHandScaling = latestHands.length === 2 && latestHands[0].isPinching && latestHands[1].isPinching
+      && gesture.state !== 'exploding' && gesture.state !== 'reforming';
+
+    if (twoHandScaling){
+      const c1 = palmCenter(latestHands[0].lm);
+      const c2 = palmCenter(latestHands[1].lm);
+      const d = dist2D(c1, c2);
+      if (twoHandBaseDist === null){
+        twoHandBaseDist = d;
+        twoHandBaseScale = sphereGroup.scale.x;
+      } else {
+        const factor = d / (twoHandBaseDist || 0.0001);
+        const target = clamp(twoHandBaseScale * factor, SCALE_MIN, SCALE_MAX);
+        const s = lerp(sphereGroup.scale.x, target, 0.18);
+        sphereGroup.scale.setScalar(s);
+      }
+      // while both hands are busy scaling, don't also run the charge state machine
+      if (gesture.state === 'charging') gesture.state = 'idle';
+      return;
+    } else {
+      twoHandBaseDist = null;
+    }
+
+    switch (gesture.state){
+      case 'idle': {
+        if (anyHandPinching){
+          const h = latestHands.find(h => h.isPinching);
+          gesture.state = 'charging';
+          gesture.chargeStart = now;
+          gesture.chargeAmount = 0;
+          gesture.chargeLandmarks = h.lm;
+        }
+        break;
+      }
+      case 'charging': {
+        const held = latestHands.find(h => h.isPinching);
+        if (held){
+          gesture.chargeLandmarks = held.lm;
+          gesture.chargeAmount = clamp((now - gesture.chargeStart) / CHARGE_DURATION_MS, 0, 1);
+        } else {
+          // released (or hand lost) — pop based on however much charge was built
+          const amt = gesture.chargeAmount;
+          gesture.state = 'exploding';
+          triggerExplosion(amt);
+        }
+        break;
+      }
+      case 'exploding': {
+        if (now - gesture.explodeStart > EXPLODE_FLIGHT_MS){
+          gesture.state = 'reforming';
+          gesture.reformStart = now;
+        }
+        break;
+      }
+      case 'reforming': {
+        if (now - gesture.reformStart > REFORM_TOTAL_MS){
+          gesture.state = 'idle';
+          gesture.chargeAmount = 0;
+          for (let i = 0; i < N_PARTICLES; i++){
+            positions[i*3] = basePositions[i*3];
+            positions[i*3+1] = basePositions[i*3+1];
+            positions[i*3+2] = basePositions[i*3+2];
+            velocities[i*3] = velocities[i*3+1] = velocities[i*3+2] = 0;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  /* =========================================================
+     AI CORE — ambient render, driven by TitanKernel.currentState
+  ========================================================= */
+  let ambientClock = 0;
+  const tmpColor      = new THREE.Color();
+  const tmpColorDeep   = new THREE.Color();
+  const tmpColorBright = new THREE.Color();
+
+  let visionSampleCanvas, visionSampleCtx;
+  function sampleVisionBrightness(){
+    if (!videoEl || videoEl.readyState < 2) return 0;
+    if (!visionSampleCanvas){
+      visionSampleCanvas = document.createElement('canvas');
+      visionSampleCanvas.width = 16;
+      visionSampleCanvas.height = 16;
+      visionSampleCtx = visionSampleCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    try {
+      visionSampleCtx.drawImage(videoEl, 0, 0, 16, 16);
+      const data = visionSampleCtx.getImageData(0, 0, 16, 16).data;
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4){
+        sum += (data[i] + data[i+1] + data[i+2]) / 3;
+      }
+      return sum / (data.length / 4) / 255;
+    } catch (e){
+      return 0;
+    }
+  }
+
+  function applyAmbientMotion(dt, now){
+    const profile = STATE_PROFILES[TitanKernel.currentState] || STATE_PROFILES.IDLE;
+    ambientClock += dt;
+
+    let visionPulse = 0;
+    if (profile.motion === 'visionReactive'){
+      visionPulse = sampleVisionBrightness();
+    }
+
+    tmpColorDeep.set(profile.colorDeep);
+    tmpColorBright.set(profile.colorBright);
+
+    for (let i = 0; i < N_PARTICLES; i++){
+      const bx = basePositions[i*3], by = basePositions[i*3+1], bz = basePositions[i*3+2];
+      let px = bx, py = by, pz = bz;
+
+      switch (profile.motion){
+        case 'vortex': {
+          const angle = (ambientClock * profile.wobbleFreq * 0.15) + (by * 0.35);
+          const cosA = Math.cos(angle), sinA = Math.sin(angle);
+          px = bx * cosA - bz * sinA;
+          pz = bx * sinA + bz * cosA;
+          py = by + Math.sin(ambientClock * profile.wobbleFreq + i * 0.21) * profile.wobbleAmp;
+          break;
+        }
+        case 'orbitalBands': {
+          const band = Math.floor(((by / BASE_RADIUS) + 1) * 3);
+          const angle = ambientClock * (0.15 + band * 0.06) * profile.wobbleFreq;
+          const cosA = Math.cos(angle), sinA = Math.sin(angle);
+          px = bx * cosA - bz * sinA;
+          pz = bx * sinA + bz * cosA;
+          break;
+        }
+        case 'scan': {
+          const bandPos = ((Math.sin(ambientClock * profile.wobbleFreq * 0.5) + 1) / 2) * 2 - 1;
+          const dBand = Math.abs((by / BASE_RADIUS) - bandPos);
+          const flash = Math.max(0, 1 - dBand * 3) * profile.wobbleAmp * 4;
+          px = bx * (1 + flash * 0.3); py = by; pz = bz * (1 + flash * 0.3);
+          break;
+        }
+        case 'burst': {
+          const pulse = (Math.sin(ambientClock * profile.wobbleFreq) * 0.5 + 0.5) * profile.wobbleAmp * 2.5;
+          px = bx * (1 + pulse); py = by * (1 + pulse); pz = bz * (1 + pulse);
+          break;
+        }
+        case 'breathe': {
+          const wob = Math.sin(ambientClock * profile.wobbleFreq + i * 0.13) * profile.wobbleAmp;
+          px = bx * (1 + wob * 0.3); py = by + wob * 0.5; pz = bz * (1 + wob * 0.3);
+          break;
+        }
+        case 'flicker': {
+          const n = Math.sin(i * 12.9898 + ambientClock * profile.wobbleFreq) * 43758.5453;
+          const rnd = n - Math.floor(n);
+          const jitter = (rnd - 0.5) * profile.wobbleAmp;
+          px = bx + jitter; py = by + jitter * 0.6; pz = bz + jitter;
+          break;
+        }
+        case 'jitter': {
+          px = bx + (Math.random() - 0.5) * profile.wobbleAmp;
+          py = by + (Math.random() - 0.5) * profile.wobbleAmp;
+          pz = bz + (Math.random() - 0.5) * profile.wobbleAmp;
+          break;
+        }
+        case 'visionReactive': {
+          const wob = Math.sin(ambientClock * profile.wobbleFreq + i * 0.37) * profile.wobbleAmp * (0.4 + visionPulse * 1.4);
+          px = bx * (1 + wob * 0.4); py = by + wob; pz = bz * (1 + wob * 0.4);
+          break;
+        }
+        case 'wobble':
+        default: {
+          const wob = Math.sin(ambientClock * profile.wobbleFreq + i * 0.37) * profile.wobbleAmp;
+          px = bx * (1 + wob * 0.4); py = by + wob; pz = bz * (1 + wob * 0.4);
+          break;
+        }
+      }
+
+      positions[i*3]   += (px - positions[i*3])   * Math.min(1, 6 * dt);
+      positions[i*3+1] += (py - positions[i*3+1]) * Math.min(1, 6 * dt);
+      positions[i*3+2] += (pz - positions[i*3+2]) * Math.min(1, 6 * dt);
+
+      const t = (by / BASE_RADIUS + 1) / 2;
+      tmpColor.copy(tmpColorDeep).lerp(tmpColorBright, t);
+      colors[i*3]   = lerp(colors[i*3],   tmpColor.r, 0.08);
+      colors[i*3+1] = lerp(colors[i*3+1], tmpColor.g, 0.08);
+      colors[i*3+2] = lerp(colors[i*3+2], tmpColor.b, 0.08);
+    }
+
+    const glowPulse = Math.sin(ambientClock * profile.glowPulseSpeed) * profile.glowPulseAmp;
+    const glowBoost = profile.motion === 'visionReactive' ? visionPulse * 0.15 : 0;
+    coreGlow.material.opacity = lerp(coreGlow.material.opacity, Math.max(0.02, profile.glow + glowPulse + glowBoost), dt * 2);
+    const scalePulse = profile.motion === 'burst' ? Math.max(0, glowPulse) * 0.5 : 0;
+    coreGlow.scale.setScalar(lerp(coreGlow.scale.x, 1 + scalePulse, dt * 2));
+  }
+
+  /* =========================================================
+     PARTICLE UPDATE
+  ========================================================= */
+  function updateParticles(dt, now){
+    const posAttr = points.geometry.attributes.position;
+    const colAttr = points.geometry.attributes.color;
+
+    if (gesture.state === 'charging'){
+      const amt = gesture.chargeAmount;
+      const pull = 1 - amt * 0.22;
+      for (let i = 0; i < N_PARTICLES; i++){
+        const tx = basePositions[i*3] * pull;
+        const ty = basePositions[i*3+1] * pull;
+        const tz = basePositions[i*3+2] * pull;
+        positions[i*3]   += (tx - positions[i*3])   * Math.min(1, 6 * dt);
+        positions[i*3+1] += (ty - positions[i*3+1]) * Math.min(1, 6 * dt);
+        positions[i*3+2] += (tz - positions[i*3+2]) * Math.min(1, 6 * dt);
+        colors[i*3]   = lerp(baseColors[i*3],   COLOR_CHARGE.r, amt);
+        colors[i*3+1] = lerp(baseColors[i*3+1], COLOR_CHARGE.g, amt);
+        colors[i*3+2] = lerp(baseColors[i*3+2], COLOR_CHARGE.b, amt);
+      }
+      coreGlow.material.opacity = 0.16 + amt * 0.5;
+      coreGlow.scale.setScalar(1 + amt * 0.6);
+    } else if (gesture.state === 'exploding'){
+      const t = (now - gesture.explodeStart) / 1000;
+      const drag = Math.pow(0.94, dt * 60);
+      for (let i = 0; i < N_PARTICLES; i++){
+        const localT = t - explodeDelays[i];
+        if (localT > 0){
+          velocities[i*3]   *= drag;
+          velocities[i*3+1] *= drag;
+          velocities[i*3+2] *= drag;
+          positions[i*3]   += velocities[i*3]   * dt * 2.2;
+          positions[i*3+1] += velocities[i*3+1] * dt * 2.2;
+          positions[i*3+2] += velocities[i*3+2] * dt * 2.2;
+          colors[i*3]   = lerp(colors[i*3],   sparkTargets[i*3],   0.12);
+          colors[i*3+1] = lerp(colors[i*3+1], sparkTargets[i*3+1], 0.12);
+          colors[i*3+2] = lerp(colors[i*3+2], sparkTargets[i*3+2], 0.12);
+        }
+      }
+      coreGlow.material.opacity = Math.max(0.1, coreGlow.material.opacity - dt * 0.4);
+    } else if (gesture.state === 'reforming'){
+      const t = (now - gesture.reformStart) / 1000;
+      for (let i = 0; i < N_PARTICLES; i++){
+        const localT = t - reformDelays[i];
+        if (localT > 0){
+          const k = Math.min(1, REFORM_CATCHUP * dt);
+          positions[i*3]   += (basePositions[i*3]   - positions[i*3])   * k;
+          positions[i*3+1] += (basePositions[i*3+1] - positions[i*3+1]) * k;
+          positions[i*3+2] += (basePositions[i*3+2] - positions[i*3+2]) * k;
+          colors[i*3]   = lerp(colors[i*3],   baseColors[i*3],   k);
+          colors[i*3+1] = lerp(colors[i*3+1], baseColors[i*3+1], k);
+          colors[i*3+2] = lerp(colors[i*3+2], baseColors[i*3+2], k);
+        }
+      }
+      coreGlow.material.opacity = lerp(coreGlow.material.opacity, 0.16, dt * 1.5);
+      coreGlow.scale.setScalar(lerp(coreGlow.scale.x, 1, dt * 2));
+    } else {
+      applyAmbientMotion(dt, now);
+    }
+
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+  }
+
+  function updateRotationAndScale(dt){
+    if (latestHands.length > 0 && !(latestHands.length === 2 && latestHands[0].isPinching && latestHands[1].isPinching)){
+      let ax = 0, ay = 0;
+      for (const h of latestHands){
+        const c = palmCenter(h.lm);
+        ax += (1 - c.x);
+        ay += c.y;
+      }
+      ax /= latestHands.length; ay /= latestHands.length;
+      const targetY = (ax - 0.5) * ROT_RANGE_Y;
+      const targetX = clamp((ay - 0.5) * ROT_RANGE_X, -ROT_RANGE_X/2, ROT_RANGE_X/2);
+      sphereGroup.rotation.y += (targetY - sphereGroup.rotation.y) * Math.min(1, ROT_SMOOTHING * dt);
+      sphereGroup.rotation.x += (targetX - sphereGroup.rotation.x) * Math.min(1, ROT_SMOOTHING * dt);
+    } else if (latestHands.length === 0){
+      const profile = STATE_PROFILES[TitanKernel.currentState] || STATE_PROFILES.IDLE;
+      const rotSpeed = profile.motion === 'jitter' ? 0.015 : (profile.motion === 'vortex' ? 0.11 : 0.06);
+      sphereGroup.rotation.y += dt * rotSpeed;
+    }
+  }
+
+  /* =========================================================
+     HUD DRAWING (charge arc + hand skeleton)
+  ========================================================= */
+  function drawHUD(){
+    const w = window.innerWidth, h = window.innerHeight;
+    hudCtx.clearRect(0, 0, w, h);
+
+    // faint hand skeleton for feedback
+    for (const hand of latestHands){
+      hudCtx.strokeStyle = 'rgba(95,231,255,0.28)';
+      hudCtx.lineWidth = 1.2;
+      hudCtx.beginPath();
+      for (const [a, b] of HAND_CONNECTIONS){
+        const p1 = hand.lm[a], p2 = hand.lm[b];
+        hudCtx.moveTo((1 - p1.x) * w, p1.y * h);
+        hudCtx.lineTo((1 - p2.x) * w, p2.y * h);
+      }
+      hudCtx.stroke();
+
+      hudCtx.fillStyle = hand.isPinching ? 'rgba(255,227,154,0.85)' : 'rgba(95,231,255,0.55)';
+      for (const lm of hand.lm){
+        hudCtx.beginPath();
+        hudCtx.arc((1 - lm.x) * w, lm.y * h, 2, 0, Math.PI * 2);
+        hudCtx.fill();
+      }
+    }
+
+    // charge arc on the active pinch
+    if (gesture.state === 'charging' && gesture.chargeLandmarks){
+      const lm = gesture.chargeLandmarks;
+      const thumb = lm[4], index = lm[8];
+      const mx = (1 - (thumb.x + index.x) / 2) * w;
+      const my = ((thumb.y + index.y) / 2) * h;
+      const r = 40;
+
+      hudCtx.beginPath();
+      hudCtx.arc(mx, my, r, 0, Math.PI * 2);
+      hudCtx.strokeStyle = 'rgba(238,240,246,0.16)';
+      hudCtx.lineWidth = 3;
+      hudCtx.stroke();
+
+      hudCtx.beginPath();
+      hudCtx.arc(mx, my, r, -Math.PI/2, -Math.PI/2 + gesture.chargeAmount * Math.PI * 2);
+      hudCtx.strokeStyle = gesture.chargeAmount >= 1 ? '#FFE39A' : '#5FE7FF';
+      hudCtx.lineWidth = 4;
+      hudCtx.lineCap = 'round';
+      hudCtx.stroke();
+    }
+  }
+
+  /* =========================================================
+     AI CORE — dev trigger panel + status readout
+  ========================================================= */
+  function hexToRgba(hex, alpha){
+    const c = new THREE.Color(hex);
+    return 'rgba(' + Math.round(c.r*255) + ',' + Math.round(c.g*255) + ',' + Math.round(c.b*255) + ',' + alpha + ')';
+  }
+
+  function updateCoreStatusUI(state){
+    const profile = STATE_PROFILES[state];
+    coreLabel.textContent = state.replace('_', ' ');
+    coreDesc.textContent = STATE_DESCRIPTIONS[state] || '';
+    coreDot.style.background = profile.colorBright;
+    coreDot.style.boxShadow = '0 0 10px 2px ' + hexToRgba(profile.colorBright, 0.55);
+    devPanelBtns.querySelectorAll('button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.state === state);
+    });
+  }
+
+  function buildDevPanel(){
+    AI_STATES.forEach(function(name){
+      const btn = document.createElement('button');
+      btn.textContent = name.replace('_', ' ');
+      btn.dataset.state = name;
+      btn.addEventListener('click', function(){
+        TitanKernel.setState(name, { source: 'dev-panel' });
+      });
+      devPanelBtns.appendChild(btn);
+    });
+  }
+
+  function cycleState(dir){
+    const idx = AI_STATES.indexOf(TitanKernel.currentState);
+    const next = AI_STATES[(idx + dir + AI_STATES.length) % AI_STATES.length];
+    TitanKernel.setState(next, { source: 'keyboard-cycle' });
+  }
+
+  window.addEventListener('keydown', function(e){
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.key === '`'){
+      devPanel.classList.toggle('hidden');
+    } else if (e.key === '['){
+      cycleState(-1);
+    } else if (e.key === ']'){
+      cycleState(1);
+    }
+  });
+
+  TitanEventBus.on('state:change', function(evt){
+    updateCoreStatusUI(evt.to);
+  });
+
+  /* =========================================================
+     MAIN LOOP
+  ========================================================= */
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const now = performance.now();
+
+    updateGesture(now);
+    updateParticles(dt, now);
+    updateRotationAndScale(dt);
+    drawHUD();
+
+    statusDot.classList.toggle('live', latestHands.length > 0);
+    statusText.textContent = latestHands.length === 0
+      ? (handsEverSeen ? 'hand lost' : 'searching for hand')
+      : (latestHands.length === 1 ? '1 hand tracked' : '2 hands tracked');
+
+    renderer.render(scene, camera);
+  }
+
+  /* =========================================================
+     MEDIAPIPE HANDS
+  ========================================================= */
+  let mpHands, mpCamera;
+
+  function onHandsResults(results){
+    const raw = results.multiHandLandmarks || [];
+    latestHands = raw.map(lm => ({ lm, pinchRatio: 1, isPinching: false }));
+    if (raw.length > 0) handsEverSeen = true;
+  }
+
+  async function initApp(){
+    hide(startScreen);
+    show(loadingScreen);
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        throw new Error('This browser does not support camera access (getUserMedia).');
+      }
+
+      mpHands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+      mpHands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5
+      });
+      mpHands.onResults(onHandsResults);
+
+      mpCamera = new Camera(videoEl, {
+        onFrame: async () => { await mpHands.send({ image: videoEl }); },
+        width: 640,
+        height: 480
+      });
+
+      await mpCamera.start();
+
+      hide(loadingScreen);
+    } catch (err){
+      console.error('Particle Storm init error:', err);
+      errorMessage.textContent = (err && err.message) ? err.message
+        : 'Camera access was blocked or unavailable. Check your browser\'s permissions for this page and try again.';
+      hide(loadingScreen);
+      show(errorScreen);
+    }
+  }
+
+  document.getElementById('startBtn').addEventListener('click', initApp);
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    hide(errorScreen);
+    show(startScreen);
+  });
+
+  /* =========================================================
+     AI CORE — public integration surface for future milestones
+     (voice, reasoning, vision, memory subsystems call in here)
+  ========================================================= */
+  window.Titan = {
+    kernel: TitanKernel,
+    bus: TitanEventBus,
+    states: AI_STATES,
+    profiles: STATE_PROFILES
+  };
+
+  /* =========================================================
+     BOOT — the sphere is alive behind the start screen too
+  ========================================================= */
+  initScene();
+  buildDevPanel();
+  updateCoreStatusUI(TitanKernel.currentState);
+  animate();
+
+})();
+</script>
+</body>
+</html>
